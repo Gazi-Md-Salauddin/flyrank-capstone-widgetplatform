@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Widget Platform Submission Test</title>
+  <style>
+    body { font: 16px system-ui, sans-serif; margin: 2rem auto; max-width: 38rem; padding: 0 1rem; }
+    label { display: block; margin: 1rem 0; }
+    input, textarea, button { box-sizing: border-box; font: inherit; padding: .55rem; width: 100%; }
+    .honeypot { height: 1px; left: -10000px; overflow: hidden; position: absolute; top: auto; width: 1px; }
+    #result { min-height: 1.5rem; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Contact us</h1>
+    <p>This plain HTML page is served from a separate local origin and posts to the API.</p>
+    <form id="lead-form">
+      <label>Name <input name="name" required maxlength="120"></label>
+      <label>Email <input name="email" type="email" required maxlength="254"></label>
+      <label>Message <textarea name="message" maxlength="1500"></textarea></label>
+      <div class="honeypot" aria-hidden="true">
+        <label>Leave this field empty <input name="website_url" tabindex="-1" autocomplete="off"></label>
+      </div>
+      <button type="submit">Send</button>
+    </form>
+    <p id="result" role="status" aria-live="polite"></p>
+  </main>
+  <script>
+    const API_URL = 'http://localhost:5000/api/submissions';
+    const WIDGET_ID = '11111111-1111-4111-8111-111111111111';
+    const form = document.querySelector('#lead-form');
+    const result = document.querySelector('#result');
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const values = new FormData(form);
+      const payload = {
+        widget_id: WIDGET_ID,
+        form_data: {
+          name: values.get('name'),
+          email: values.get('email'),
+          message: values.get('message')
+        },
+        website_url: values.get('website_url')
+      };
+
+      result.textContent = 'Sending…';
+      try {
+        const response = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const body = await response.json();
+        result.textContent = body.success ? 'Submission received.' : body.message;
+      } catch {
+        result.textContent = 'Could not reach the API. Check that it is running.';
+      }
+    });
+  </script>
+</body>
+</html>
