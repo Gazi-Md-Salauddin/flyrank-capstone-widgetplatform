@@ -143,23 +143,40 @@ function createSubmissionRepository(pool) {
     async getDashboardStats(tenantId, filters) {
       const values = [tenantId, filters.from, filters.to];
       let widgetFilter = '';
+      let geoWidgetFilter = '';
       if (filters.widgetId) {
         values.push(filters.widgetId);
         widgetFilter = ` AND s.widget_id = $${values.length}`;
+        geoWidgetFilter = ` AND widget_id = $${values.length}`;
       }
 
-      const result = await pool.query(
-        `SELECT s.widget_id, w.title, count(*)::int AS submissions
-         FROM submissions s
-         JOIN widgets w ON w.id = s.widget_id AND w.tenant_id = s.tenant_id
-         WHERE s.tenant_id = $1 AND s.created_at >= $2 AND s.created_at < $3${widgetFilter}
-         GROUP BY s.widget_id, w.title
-         ORDER BY submissions DESC`,
-        values
-      );
+      const [byWidget, geoBreakdown] = await Promise.all([
+        pool.query(
+          `SELECT s.widget_id, w.title, count(*)::int AS submissions
+           FROM submissions s
+           JOIN widgets w ON w.id = s.widget_id AND w.tenant_id = s.tenant_id
+           WHERE s.tenant_id = $1 AND s.created_at >= $2 AND s.created_at < $3${widgetFilter}
+           GROUP BY s.widget_id, w.title
+           ORDER BY submissions DESC`,
+          values
+        ),
+        pool.query(
+          `SELECT geo->>'country_code' AS country_code,
+                  geo->>'country' AS country,
+                  count(*)::int AS submissions
+           FROM submissions s
+           WHERE s.tenant_id = $1 AND s.created_at >= $2 AND s.created_at < $3
+             AND geo IS NOT NULL${geoWidgetFilter}
+           GROUP BY geo->>'country_code', geo->>'country'
+           ORDER BY submissions DESC`,
+          values
+        )
+      ]);
+
       return {
-        total_submissions: result.rows.reduce((total, row) => total + row.submissions, 0),
-        by_widget: result.rows
+        total_submissions: byWidget.rows.reduce((total, row) => total + row.submissions, 0),
+        by_widget: byWidget.rows,
+        geo_breakdown: geoBreakdown.rows
       };
     }
   };

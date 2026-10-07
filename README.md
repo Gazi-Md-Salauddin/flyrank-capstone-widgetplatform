@@ -91,13 +91,30 @@ The local capstone configures one owner token/tenant pair. Owner SQL still scope
 
 Dashboard date filters accept ISO timestamps via `from` and `to`, with a maximum 90-day span; submissions also accept `limit` (1–100), `offset`, and `widget_id`. Default date range is the most recent 30 days.
 
-## Database query and automated tests
+## Database-backed dashboard persistence check
 
-After a browser submission, inspect stored records:
+1. Start PostgreSQL with `npm run db:up`, then start the API with `npm start`. The API applies `src/db/init.sql` on startup; the SQL creates/updates the widget and submissions schema and seeds the local demo widget. Set `DATABASE_URL` and `POSTGRES_PASSWORD` consistently in `.env`.
+2. Serve the customer page with `npm run customer-site`, open `http://localhost:5500`, and submit a valid form.
+3. In PostgreSQL, confirm a row exists:
 
 ```powershell
 docker compose exec db psql -U widgetplatform -d widgetplatform -c "SELECT id, widget_id, tenant_id, form_data, visitor_ip, geo, created_at FROM submissions ORDER BY created_at DESC LIMIT 5;"
 ```
+
+4. Stop the API process with Ctrl+C and restart it using `npm start`. Do not stop/remove the Docker database volume.
+5. From PowerShell, set the same owner bearer token configured in `.env` and query the dashboard:
+
+```powershell
+$ownerHeaders = @{ Authorization = "Bearer <OWNER_API_TOKEN>" }
+Invoke-RestMethod -Uri "http://localhost:5000/api/dashboard/submissions" -Headers $ownerHeaders
+Invoke-RestMethod -Uri "http://localhost:5000/api/dashboard/stats" -Headers $ownerHeaders
+```
+
+The submissions response is tenant-scoped, paginated, and includes the stored submission data. Stats return `total_submissions`, `by_widget`, and `geo_breakdown` for available geo enrichment. The authenticated tenant comes from the configured owner token/tenant mapping; do not send an owner ID as an authorization substitute.
+
+Use a second tenant/token configuration and corresponding widget/submissions to check isolation; each dashboard query must only return the authenticated tenant's records. The live PostgreSQL/restart check was not completed in the current environment; see [EVIDENCE.md](./EVIDENCE.md).
+
+## Automated tests
 
 Run all submission, delivery, owner isolation, dashboard, and CORS tests:
 

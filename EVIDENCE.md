@@ -22,7 +22,20 @@ This file distinguishes automated checks from the full live database proof. Test
 
 ## Durable database gate
 
-Not verified: the PostgreSQL container could not be started in this environment. After a PostgreSQL-backed browser submit, query:
+**NOT VERIFIED:** PostgreSQL was not running, so no database row, API restart, or PostgreSQL-backed dashboard response was observed in this environment.
+
+The required database command was attempted:
+
+```text
+> npm run db:up
+request returned 500 Internal Server Error for API route and version http://%2F%2F.%2Fpipe%2FdockerDesktopLinuxEngine/_ping, check if the server supports the requested API version
+```
+
+`localhost:5432` was also checked and did not accept a TCP connection. Do not treat the in-memory browser check or SQL-mocking unit tests as durable-storage evidence.
+
+Docker Desktop recovery was also attempted with `docker desktop restart` and `docker desktop start`; both commands remained pending and were stopped after `docker desktop status` continued to report `Status: stopped`. A final port check still reported no listener on 5432.
+
+When Docker is available, perform the restart proof from the README and query:
 
 ```sql
 SELECT id, widget_id, tenant_id, form_data, visitor_ip, geo, created_at
@@ -31,13 +44,19 @@ ORDER BY created_at DESC
 LIMIT 5;
 ```
 
-Record the observed row/result here only after a PostgreSQL-backed run.
+Record the actual observed row/result here only after a PostgreSQL-backed run.
+
+## Database repository checks
+
+Repository unit tests confirm that submission persistence executes a parameterized PostgreSQL `INSERT` with widget, tenant, form data, visitor IP, geo, origin, and user-agent values. Dashboard repository tests check tenant/date/widget filters in SQL construction. These tests do not connect to PostgreSQL and are not proof of durable rows or API restart survival.
+
+Dashboard stats include total submissions, counts by widget, and a `geo_breakdown` grouped from persisted geo JSON where available.
 
 ## Phase 3 checks performed
 
-- `npm test` — 23 tests passed, 0 failed (Phase 2 and Phase 3).
+- `npm test` — 26 tests passed, 0 failed. The three repository tests inspect SQL construction and parameters using a mock `pool.query`; they are not PostgreSQL integration tests.
 - JavaScript syntax checks passed for application, customer site, and tests.
 - `docker compose config --quiet` passed with `.env.example` values copied temporarily to `.env`; the temporary file was removed afterward.
 - Environment validation passed against `.env.example`.
 - Browser delivery and form submission passed across ports 5500 and 5000 using the in-memory API harness described above.
-- `npm run db:up`/live database verification remains blocked by Docker Desktop: its Linux engine failed to start. Compose syntax/configuration validation did pass with the example environment values.
+- `npm run db:up`/live database verification remains blocked by Docker Desktop: the Linux engine `_ping` returned HTTP 500, Docker Desktop status remained stopped, and localhost:5432 refused the connection. Compose syntax/configuration validation did pass with the example environment values.

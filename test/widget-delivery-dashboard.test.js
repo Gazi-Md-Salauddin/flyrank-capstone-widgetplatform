@@ -88,7 +88,12 @@ function makeHarness() {
     },
     async getDashboardStats(tenantId, filters) {
       queryTenants.push(tenantId);
-      return { total_submissions: 1, by_widget: [{ widget_id: widgetId, title: 'Contact us', submissions: 1 }], filters };
+      return {
+        total_submissions: 1,
+        by_widget: [{ widget_id: widgetId, title: 'Contact us', submissions: 1 }],
+        geo_breakdown: [{ country_code: 'EX', country: 'Exampleland', submissions: 1 }],
+        filters
+      };
     },
     async createSubmission(submission) {
       return { id: 'submission-public', created_at: new Date().toISOString(), ...submission };
@@ -242,6 +247,9 @@ test('dashboard endpoints require auth and scope queries to authenticated tenant
   const stats = await ownerRequest(app, 'get', '/api/dashboard/stats');
   assert.equal(stats.status, 200);
   assert.equal(stats.body.total_submissions, 1);
+  assert.deepEqual(stats.body.geo_breakdown, [
+    { country_code: 'EX', country: 'Exampleland', submissions: 1 }
+  ]);
   assert.deepEqual(queryTenants, [tenantA, tenantA]);
 
   const invalidRange = await ownerRequest(app, 'get', '/api/dashboard/stats')
