@@ -6,8 +6,11 @@ dotenv.config();
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().min(1).max(65535).default(5000),
-  HOST: z.string().min(1).default('127.0.0.1'),
+  HOST: z.string().min(1).default('localhost'),
   DATABASE_URL: z.string().min(1),
+  API_BASE_URL: z.string().url().default('http://localhost:5000'),
+  OWNER_API_TOKEN: z.string().min(32),
+  OWNER_TENANT_ID: z.string().uuid(),
   CORS_ALLOWED_ORIGINS: z.string().default('http://localhost:5500'),
   RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(10),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1000).default(60000),
@@ -23,6 +26,11 @@ function loadConfig(source = process.env) {
   }
 
   const config = parsed.data;
+  const apiBaseUrl = new URL(config.API_BASE_URL);
+  if (apiBaseUrl.pathname !== '/' || apiBaseUrl.search || apiBaseUrl.hash
+    || apiBaseUrl.username || apiBaseUrl.password) {
+    throw new Error('API_BASE_URL must be an origin without credentials, path, query, or fragment.');
+  }
   const localModes = [
     config.GEO_PROVIDER_A_MODE !== 'live',
     config.GEO_PROVIDER_B_MODE !== 'live',
@@ -54,6 +62,9 @@ function loadConfig(source = process.env) {
     port: config.PORT,
     host: config.HOST,
     databaseUrl: config.DATABASE_URL,
+    apiBaseUrl: apiBaseUrl.origin,
+    ownerApiToken: config.OWNER_API_TOKEN,
+    ownerTenantId: config.OWNER_TENANT_ID,
     allowedOrigins: origins,
     rateLimitMax: config.RATE_LIMIT_MAX,
     rateLimitWindowMs: config.RATE_LIMIT_WINDOW_MS,

@@ -1,4 +1,6 @@
 const { Pool } = require('pg');
+const { readFile } = require('node:fs/promises');
+const path = require('node:path');
 const { createApp } = require('./app');
 const { loadConfig } = require('./config/env');
 const { createSubmissionRepository } = require('./db/submission-repository');
@@ -11,8 +13,10 @@ async function start() {
 
   try {
     await pool.query('SELECT 1');
+    const schema = await readFile(path.join(__dirname, 'db', 'init.sql'), 'utf8');
+    await pool.query(schema);
   } catch {
-    console.error('[startup] Database connection failed; verify DATABASE_URL and start PostgreSQL.');
+    console.error('[startup] Database connection or schema setup failed; verify DATABASE_URL and PostgreSQL.');
     await pool.end();
     process.exitCode = 1;
     return;
@@ -27,7 +31,10 @@ async function start() {
     notificationService: createNotificationService({ mode: config.notificationMode }),
     allowedOrigins: config.allowedOrigins,
     rateLimitMax: config.rateLimitMax,
-    rateLimitWindowMs: config.rateLimitWindowMs
+    rateLimitWindowMs: config.rateLimitWindowMs,
+    apiBaseUrl: config.apiBaseUrl,
+    ownerApiToken: config.ownerApiToken,
+    ownerTenantId: config.ownerTenantId
   });
 
   const server = app.listen(config.port, config.host, () => {
